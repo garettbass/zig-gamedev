@@ -225,6 +225,8 @@ pub fn JobQueue(
 
         const FreeQueue = RingQueue(usize, max_jobs);
         const LiveQueue = RingQueue(JobId, max_jobs);
+        const IdleQueue = @import("idle_queue.zig").IdleQueue(max_threads);
+
 
         // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -235,6 +237,7 @@ pub fn JobQueue(
         _mutex       : Mutex     = .{},
         _live_queue  : LiveQueue = .{},
         _free_queue  : FreeQueue = .{},
+        _idle_queue  : IdleQueue = .{},
         _num_threads : u64       = 0,
         _main_thread : Atomic(u64)  = .{ .value = 0 },
         _lock_thread : Atomic(u64)  = .{ .value = 0 },
@@ -502,7 +505,7 @@ pub fn JobQueue(
         pub fn wait(self: *Self, prereq: JobId) void {
             while (self.isPending(prereq)) {
                 // print("waiting for prereq {}...\n", .{prereq});
-                threadIdle();
+                self.threadIdle();
             }
         }
 
@@ -534,6 +537,7 @@ pub fn JobQueue(
             }
 
             self._live_queue.enqueueAssumeNotFull(new_id);
+            self._idle_queue.wake();
         }
 
         // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -547,16 +551,18 @@ pub fn JobQueue(
 
             while (self.isRunning()) {
                 self.executeJobs(.unlocked, .dequeue_jobid_if_running);
-                threadIdle();
+                self.threadIdle();
             }
 
             // print("thread[{}] DONE\n", .{n});
         }
 
-        fn threadIdle() void {
-            if (idle_sleep_ns > 0) {
-                std.time.sleep(idle_sleep_ns);
-            }
+        fn threadIdle(self: *Self) void {
+            self._idle_queue.idle();
+            // ignore(self);
+            // if (idle_sleep_ns > 0) {
+            //     std.time.sleep(idle_sleep_ns);
+            // }
         }
 
         // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -678,6 +684,7 @@ pub fn JobQueue(
                 self.wait(slot.prereq);
                 slot.executeJob(id);
             }
+            defer self._idle_queue.wake();
 
             const free_index = _id.index;
 
