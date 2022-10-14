@@ -330,6 +330,8 @@ pub fn JobQueue(
             // prevent scheduling more jobs
             const was_stopping = self._stopping.swap(true, .Monotonic);
             assert(was_stopping == false);
+
+            self._idle_queue.wake(); // wake all idle threads
         }
 
         /// Waits for all threads to finish, then executes any remaining jobs
