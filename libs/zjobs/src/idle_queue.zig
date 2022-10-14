@@ -44,12 +44,12 @@ pub fn IdleQueue(comptime _capacity: u16) type {
                 self._entries.enqueueAssumeNotFull(&entry);
             }
 
-            const this_thread = std.Thread.getCurrentId();
-            std.debug.print("~{} idle\n", .{ this_thread });
+            // const this_thread = std.Thread.getCurrentId();
+            // std.debug.print("~{} idle\n", .{ this_thread });
             while (!entry.awakened) {
                 entry.condition.wait(&entry.mutex);
             }
-            std.debug.print("~{} wake\n", .{ this_thread });
+            // std.debug.print("~{} wake\n", .{ this_thread });
         }
 
         pub fn wake(self: *Self) void {
