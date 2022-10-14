@@ -560,7 +560,9 @@ pub fn JobQueue(
         }
 
         fn threadIdle(self: *Self) void {
-            self._idle_queue.idle();
+            if (self.isRunning()) {
+                self._idle_queue.idle();
+            }
             // ignore(self);
             // if (idle_sleep_ns > 0) {
             //     std.time.sleep(idle_sleep_ns);
