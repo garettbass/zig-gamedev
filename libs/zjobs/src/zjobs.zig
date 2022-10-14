@@ -539,7 +539,7 @@ pub fn JobQueue(
             }
 
             self._live_queue.enqueueAssumeNotFull(new_id);
-            self._idle_queue.wake();
+            self._idle_queue.wake(); // wake threads awaiting jobs
         }
 
         // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -685,8 +685,8 @@ pub fn JobQueue(
                 assert(self.isUnlockedThread());
                 self.wait(slot.prereq);
                 slot.executeJob(id);
+                self._idle_queue.wake(); // wake threads awaiting prereqs
             }
-            defer self._idle_queue.wake();
 
             const free_index = _id.index;
 
