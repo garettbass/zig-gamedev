@@ -225,7 +225,7 @@ pub fn JobQueue(
 
         const FreeQueue = RingQueue(usize, max_jobs);
         const LiveQueue = RingQueue(JobId, max_jobs);
-        const IdleQueue = @import("idle_queue.zig").IdleQueue(max_threads);
+        const IdleQueue = @import("idle_queue.zig").IdleQueue(1 + max_threads);
 
 
         // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
