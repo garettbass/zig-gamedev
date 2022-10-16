@@ -76,9 +76,6 @@ pub const JobId = enum(u32) {
 /// * `max_threads` - the maximum number of threads that can be spawned by the
 ///   `JobQueue`. Even when `max_threads` is greater, the `JobQueue` will never
 ///   spawn more than `std.Thread.getCpuCount() - 1` threads.
-/// * `idle_sleep_ns` - the maximum number of nanoseconds to sleep when a
-///   thread is waiting for a job to become available.  When `idle_sleep_ns`
-///   is `0`, idle threads will not sleep at all.
 ///
 /// Open issues:
 /// * `JobQueue` is not designed to support single threaded environments, and
@@ -90,7 +87,6 @@ pub fn JobQueue(
         max_jobs      : u16 = 256,
         max_job_size  : u16 =  64,
         max_threads   : u8  =   8,
-        idle_sleep_ns : u32 =  10,
         // zig fmt: on
     },
 ) type {
@@ -210,8 +206,6 @@ pub fn JobQueue(
         pub const max_threads: u8 = config.max_threads;
 
         pub const max_job_size: u16 = config.max_job_size;
-
-        pub const idle_sleep_ns: u64 = config.idle_sleep_ns;
 
         // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -563,10 +557,6 @@ pub fn JobQueue(
             if (self.isRunning()) {
                 self._idle_queue.idle();
             }
-            // ignore(self);
-            // if (idle_sleep_ns > 0) {
-            //     std.time.sleep(idle_sleep_ns);
-            // }
         }
 
         // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -687,8 +677,9 @@ pub fn JobQueue(
                 assert(self.isUnlockedThread());
                 self.wait(slot.prereq);
                 slot.executeJob(id);
-                self._idle_queue.wake(); // wake threads awaiting prereqs
             }
+
+            self._idle_queue.wake(); // wake threads awaiting prereqs
 
             const free_index = _id.index;
 

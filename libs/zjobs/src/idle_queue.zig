@@ -29,39 +29,48 @@ pub fn IdleQueue(comptime _capacity: u16) type {
         // zig fmt: off
         _mutex   : Mutex      = .{},
         _entries : EntryQueue = .{},
+        _cycle   : usize      = 0,
         // zig fmt: on
 
         // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
         pub fn idle(self: *Self) void {
-            var entry = Entry{};
-            entry.mutex.lock();
-            defer entry.mutex.unlock();
+            const idle_cycle = self._cycle;
+            self._mutex.lock();
 
-            {
-                self._mutex.lock();
-                defer self._mutex.unlock();
-                self._entries.enqueueAssumeNotFull(&entry);
+            if (self._cycle != idle_cycle) {
+                // wake() was called while waiting for self._mutex.lock()
+                self._mutex.unlock();
+                return;
             }
 
-            // const this_thread = std.Thread.getCurrentId();
-            // std.debug.print("~{} idle\n", .{ this_thread });
+            var entry = Entry{};
+            entry.mutex.lock();
+
+            self._entries.enqueueAssumeNotFull(&entry);
+            self._mutex.unlock();
+
             while (!entry.awakened) {
                 entry.condition.wait(&entry.mutex);
             }
-            // std.debug.print("~{} wake\n", .{ this_thread });
+
+            entry.mutex.unlock();
         }
 
         pub fn wake(self: *Self) void {
             self._mutex.lock();
-            defer self._mutex.unlock();
+
+            // increment cycle in case idle() is called during wake()
+            self._cycle +%= 1;
 
             while (self._entries.dequeueIfNotEmpty()) |entry| {
                 entry.mutex.lock();
-                defer entry.mutex.unlock();
                 entry.awakened = true;
                 entry.condition.signal();
+                entry.mutex.unlock();
             }
+
+            self._mutex.unlock();
         }
     };
 }
